@@ -8,6 +8,11 @@ on:
         default: true
 
   workflow_dispatch:
+    inputs:
+      custom_mpp_url:
+        description: 'Direct link to a custom .mpp artifact (Leave empty for default config)'
+        required: false
+        type: string
 
 jobs:
   run:
@@ -50,6 +55,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: $GITHUB_REPOSITORY
           NEXT_VER_CODE: ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
+          CUSTOM_MPP_URL: ${{ inputs.custom_mpp_url }}
 
       - name: Get output
         id: get_output
