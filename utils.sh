@@ -119,22 +119,18 @@ get_prebuilts() {
 				epr "No asset was found"
 				return 1
 			elif [ "$(jq 'length' <<<"$matches")" -ne 1 ]; then
-				wpr "More than 1 asset was found for this release. Falling back to the first one found..."
+			# --- CUSTOM MPP INTERCEPTOR ---
+			if [ -n "$CUSTOM_MPP_URL" ]; then
+				wpr "Custom URL detected! Overriding default patches with: $CUSTOM_MPP_URL"
+				curl -sL "$CUSTOM_MPP_URL" -o "$file"
+				
+				# Add a clear warning to the GitHub Release Notes / Telegram message
+				if [ ! -f "build.md" ] || ! grep -q "CUSTOM BUILD" build.md; then
+					echo -e "\n⚠️ **CUSTOM BUILD**: Patched using a direct artifact link:\n🔗 $CUSTOM_MPP_URL\n" >> "build.md"
+				fi
 			fi
-			asset=$(jq -r ".[0]" <<<"$matches")
-			url=$(jq -r .url <<<"$asset")
-			name=$(jq -r .name <<<"$asset")
-			file="${dir}/${name}"
-			gh_dl "$file" "$url" >&2 || return 1
-			echo "$tag: $(cut -d/ -f1 <<<"$src")/${name}  " >>"${cl_dir}/changelog.md"
-		else
-			grab_cl=false
-			name=$(basename "$file")
-			tag_name=$(cut -d'-' -f3- <<<"$name")
-			tag_name=v${tag_name%.*}
-		fi
-
-		if [ "$tag" = "Patches" ]; then
+			# ------------------------------
+			
 			if [ "$grab_cl" = true ]; then echo -e "[Changelog](https://github.com/${src}/releases/tag/${tag_name})\n" >>"${cl_dir}/changelog.md"; fi
 			if [ "$REMOVE_RV_INTEGRATIONS_CHECKS" = true ]; then
 				local extensions_ext
@@ -711,8 +707,15 @@ build_rv() {
 	fi
 
 	local patcher_args patched_apk build_mode
-	local rv_brand_f=${args[rv_brand],,}
+		local rv_brand_f=${args[rv_brand],,}
 	rv_brand_f=${rv_brand_f// /-}
+	
+	# --- RENAME CUSTOM FILES ---
+	if [ -n "$CUSTOM_MPP_URL" ]; then
+		rv_brand_f="${rv_brand_f}-custom"
+	fi
+	# ---------------------------
+
 	if [ "${args[patcher_args]}" ]; then p_patcher_args+=("${args[patcher_args]}"); fi
 	for build_mode in "${build_mode_arr[@]}"; do
 		patcher_args=("${p_patcher_args[@]}")
