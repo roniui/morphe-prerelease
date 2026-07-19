@@ -119,6 +119,23 @@ get_prebuilts() {
 				epr "No asset was found"
 				return 1
 			elif [ "$(jq 'length' <<<"$matches")" -ne 1 ]; then
+				wpr "More than 1 asset was found for this release. Falling back to the first one found..."
+			fi
+			asset=$(jq -r ".[0]" <<<"$matches")
+			url=$(jq -r .url <<<"$asset")
+			name=$(jq -r .name <<<"$asset")
+			file="${dir}/${name}"
+			gh_dl "$file" "$url" >&2 || return 1
+			echo "$tag: $(cut -d/ -f1 <<<"$src")/${name}  " >>"${cl_dir}/changelog.md"
+		else
+			grab_cl=false
+			name=$(basename "$file")
+			tag_name=$(cut -d'-' -f3- <<<"$name")
+			tag_name=v${tag_name%.*}
+		fi
+
+		if [ "$tag" = "Patches" ]; then
+		
 			# --- CUSTOM MPP INTERCEPTOR ---
 			if [ -n "$CUSTOM_MPP_URL" ]; then
 				wpr "Custom URL detected! Overriding default patches with: $CUSTOM_MPP_URL"
@@ -707,7 +724,7 @@ build_rv() {
 	fi
 
 	local patcher_args patched_apk build_mode
-		local rv_brand_f=${args[rv_brand],,}
+	local rv_brand_f=${args[rv_brand],,}
 	rv_brand_f=${rv_brand_f// /-}
 	
 	# --- RENAME CUSTOM FILES ---
