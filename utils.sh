@@ -126,7 +126,11 @@ get_prebuilts() {
 			name=$(jq -r .name <<<"$asset")
 			file="${dir}/${name}"
 			gh_dl "$file" "$url" >&2 || return 1
-			echo "$tag: $(cut -d/ -f1 <<<"$src")/${name}  " >>"${cl_dir}/changelog.md"
+			
+			# Prevent default tool versions from printing to release notes during custom builds
+			if [ -z "$CUSTOM_MPP_URL" ]; then
+				echo "$tag: $(cut -d/ -f1 <<<"$src")/${name}  " >>"${cl_dir}/changelog.md"
+			fi
 		else
 			grab_cl=false
 			name=$(basename "$file")
@@ -145,10 +149,20 @@ get_prebuilts() {
 				if [ ! -f "build.md" ] || ! grep -q "CUSTOM BUILD" build.md; then
 					echo -e "\n⚠️ **CUSTOM BUILD**: Patched using a direct artifact link:\n🔗 $CUSTOM_MPP_URL\n" >> "build.md"
 				fi
+				
+				# Remove legacy Patches/CLI lines from previous runs in build.md
+				if [ -f "build.md" ]; then
+					sed -i '/^Patches: /d' build.md
+					sed -i '/^\[Changelog\]/d' build.md
+					sed -i '/^CLI: /d' build.md
+				fi
 			fi
 			# ------------------------------
 			
-			if [ "$grab_cl" = true ]; then echo -e "[Changelog](https://github.com/${src}/releases/tag/${tag_name})\n" >>"${cl_dir}/changelog.md"; fi
+			if [ "$grab_cl" = true ] && [ -z "$CUSTOM_MPP_URL" ]; then 
+				echo -e "[Changelog](https://github.com/${src}/releases/tag/${tag_name})\n" >>"${cl_dir}/changelog.md"
+			fi
+			
 			if [ "$REMOVE_RV_INTEGRATIONS_CHECKS" = true ]; then
 				local extensions_ext
 				extensions_ext=$(unzip -l "${file}" "extensions/shared.*" | grep -o "shared\..*") extensions_ext="${extensions_ext#*.}"
