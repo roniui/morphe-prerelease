@@ -71,21 +71,23 @@ jobs:
           CONFIG_FILE="config.toml"
           if [ -f "config.json" ]; then CONFIG_FILE="config.json"; fi
           
-          TARGETS=()
+          # Safely build an array of arguments to prevent spacing errors
+          ARGS=("$CONFIG_FILE")
+          
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            if [ "${{ inputs.build_youtube }}" == 'true' ]; then TARGETS+=("YouTube-Morphe-Universal"); fi
-            if [ "${{ inputs.build_ytm_v8a }}" == 'true' ]; then TARGETS+=("Music-Morphe-arm64-v8a"); fi
-            if [ "${{ inputs.build_ytm_v7a }}" == 'true' ]; then TARGETS+=("Music-Morphe-arm-v7a"); fi
+            if [ "${{ inputs.build_youtube }}" == 'true' ]; then ARGS+=("YouTube-Morphe-Universal"); fi
+            if [ "${{ inputs.build_ytm_v8a }}" == 'true' ]; then ARGS+=("Music-Morphe-arm64-v8a"); fi
+            if [ "${{ inputs.build_ytm_v7a }}" == 'true' ]; then ARGS+=("Music-Morphe-arm-v7a"); fi
             
-            # Safety Catch: If manually run but NO boxes are checked, exit gracefully
-            if [ ${#TARGETS[@]} -eq 0 ]; then
+            # If the array only contains the config file (length of 1), exit safely
+            if [ ${#ARGS[@]} -eq 1 ]; then
               echo "No apps selected for building. Exiting."
               exit 0
             fi
           fi
           
-          echo "Executing: ./build.sh $CONFIG_FILE${TARGETS[@]}"
-          ./build.sh $CONFIG_FILE "${TARGETS[@]}"
+          echo "Executing: ./build.sh ${ARGS[@]}"
+          ./build.sh "${ARGS[@]}"
 
       - name: Get output
         id: get_output
@@ -102,7 +104,6 @@ jobs:
           TAG: ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
           BODY: ${{ steps.get_output.outputs.BUILD_LOG }}
         run: |
-          # Only attempt upload if files exist in the build directory
           if [ "$(ls -A ./build 2>/dev/null)" ]; then
             if gh release view "$TAG" >/dev/null 2>&1; then
               gh release edit "$TAG" --title "Release" --notes "$BODY"
@@ -177,7 +178,6 @@ jobs:
             fi
           done
           
-          # Skip Telegram post if no files were built
           if [ -z "$APKS" ] && [ -z "$MODULES" ]; then
             echo "No files to report. Skipping Telegram message."
             exit 0
