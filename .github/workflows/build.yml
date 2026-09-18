@@ -22,7 +22,7 @@ on:
         type: boolean
         default: true
       build_ytm_v7a:
-        description: 'Build YT Music (armeabi-v7a)'
+        description: 'Build YT Music (arm-v7a)'
         type: boolean
         default: true
 
@@ -71,15 +71,21 @@ jobs:
           CONFIG_FILE="config.toml"
           if [ -f "config.json" ]; then CONFIG_FILE="config.json"; fi
           
-          TARGETS=""
+          TARGETS=()
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            if [ "${{ inputs.build_youtube }}" == 'true' ]; then TARGETS="$TARGETS YouTube-Morphe-Universal"; fi
-            if [ "${{ inputs.build_ytm_v8a }}" == 'true' ]; then TARGETS="$TARGETS Music-Morphe-arm64-v8a"; fi
-            if [ "${{ inputs.build_ytm_v7a }}" == 'true' ]; then TARGETS="$TARGETS Music-Morphe-arm-v7a"; fi
+            if [ "${{ inputs.build_youtube }}" == 'true' ]; then TARGETS+=("YouTube-Morphe-Universal"); fi
+            if [ "${{ inputs.build_ytm_v8a }}" == 'true' ]; then TARGETS+=("Music-Morphe-arm64-v8a"); fi
+            if [ "${{ inputs.build_ytm_v7a }}" == 'true' ]; then TARGETS+=("Music-Morphe-arm-v7a"); fi
+            
+            # Safety Catch: If manually run but NO boxes are checked, exit gracefully
+            if [ ${#TARGETS[@]} -eq 0 ]; then
+              echo "No apps selected for building. Exiting."
+              exit 0
+            fi
           fi
           
-          echo "Executing: ./build.sh $CONFIG_FILE$TARGETS"
-          ./build.sh $CONFIG_FILE$TARGETS
+          echo "Executing: ./build.sh $CONFIG_FILE${TARGETS[@]}"
+          ./build.sh $CONFIG_FILE "${TARGETS[@]}"
 
       - name: Get output
         id: get_output
@@ -96,11 +102,16 @@ jobs:
           TAG: ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
           BODY: ${{ steps.get_output.outputs.BUILD_LOG }}
         run: |
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --title "Release" --notes "$BODY"
-            gh release upload "$TAG" ./build/* --clobber
+          # Only attempt upload if files exist in the build directory
+          if [ "$(ls -A ./build 2>/dev/null)" ]; then
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              gh release edit "$TAG" --title "Release" --notes "$BODY"
+              gh release upload "$TAG" ./build/* --clobber
+            else
+              gh release create "$TAG" ./build/* --title "Release" --notes "$BODY"
+            fi
           else
-            gh release create "$TAG" ./build/* --title "Release" --notes "$BODY"
+            echo "No files built. Skipping release upload."
           fi
 
       - name: Update modules changelog and update json
@@ -117,7 +128,7 @@ jobs:
           }"
           }
 
-          cd build || { echo "build folder not found"; exit 1; }
+          cd build || { echo "build folder not found"; exit 0; }
           for OUTPUT in *module*.zip; do
             [ "$OUTPUT" = "*module*.zip" ] && continue
             ZIP_S=$(unzip -p "$OUTPUT" module.prop)
@@ -151,7 +162,7 @@ jobs:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
         if: env.TG_TOKEN != null
         run: |
-          cd build || { echo "build folder not found"; exit 1; }
+          cd build || { echo "build folder not found"; exit 0; }
 
           TG_CHAT="@rvc_magisk"
           NL=$'\n'
@@ -165,6 +176,13 @@ jobs:
               MODULES+="${NL}📦[${OUTPUT}](${DL_URL})"
             fi
           done
+          
+          # Skip Telegram post if no files were built
+          if [ -z "$APKS" ] && [ -z "$MODULES" ]; then
+            echo "No files to report. Skipping Telegram message."
+            exit 0
+          fi
+          
           MODULES=${MODULES#"$NL"}
           APKS=${APKS#"$NL"}
 
