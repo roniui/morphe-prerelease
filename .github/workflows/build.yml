@@ -13,6 +13,18 @@ on:
         description: 'Direct link to a custom .mpp artifact (Leave empty for default config)'
         required: false
         type: string
+      build_youtube:
+        description: 'Build YouTube'
+        type: boolean
+        default: true
+      build_ytm_v8a:
+        description: 'Build YT Music (arm64-v8a)'
+        type: boolean
+        default: true
+      build_ytm_v7a:
+        description: 'Build YT Music (armeabi-v7a)'
+        type: boolean
+        default: true
 
 jobs:
   run:
@@ -50,12 +62,24 @@ jobs:
           echo "NEXT_VER_CODE=$((TAG + 1))" >> $GITHUB_OUTPUT
 
       - name: Build modules/APKs
-        run: if [ -f "config.json" ]; then ./build.sh config.json; else ./build.sh config.toml; fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: $GITHUB_REPOSITORY
           NEXT_VER_CODE: ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
           CUSTOM_MPP_URL: ${{ inputs.custom_mpp_url }}
+        run: |
+          CONFIG_FILE="config.toml"
+          if [ -f "config.json" ]; then CONFIG_FILE="config.json"; fi
+          
+          TARGETS=""
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            if [ "${{ inputs.build_youtube }}" == 'true' ]; then TARGETS="$TARGETS YouTube-Morphe-Universal"; fi
+            if [ "${{ inputs.build_ytm_v8a }}" == 'true' ]; then TARGETS="$TARGETS Music-Morphe-arm64-v8a"; fi
+            if [ "${{ inputs.build_ytm_v7a }}" == 'true' ]; then TARGETS="$TARGETS Music-Morphe-arm-v7a"; fi
+          fi
+          
+          echo "Executing: ./build.sh $CONFIG_FILE$TARGETS"
+          ./build.sh $CONFIG_FILE$TARGETS
 
       - name: Get output
         id: get_output
