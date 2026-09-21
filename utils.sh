@@ -5,7 +5,7 @@ CWD=$(pwd)
 TEMP_DIR="temp"
 BIN_DIR="bin"
 BUILD_DIR="build"
-DL_SRCS=("direct" "archive" "apkmirror" "uptodown")
+DL_SRCS=("direct" "archive" "github" "apkmirror" "uptodown")
 
 if [ "${GITHUB_TOKEN-}" ]; then GH_HEADER="Authorization: token ${GITHUB_TOKEN}"; else GH_HEADER=; fi
 NEXT_VER_CODE=${NEXT_VER_CODE:-$(date +'%Y%m%d')}
@@ -568,6 +568,81 @@ get_archive_resp() {
 }
 get_archive_vers() { sed 's/^[^-]*-//;s/-\(all\|arm64-v8a\|arm-v7a\)\.apk//g' <<<"$__ARCHIVE_RESP__"; }
 get_archive_pkg_name() { echo "$__ARCHIVE_PKG_NAME__"; }
+
+# -------------------- github --------------------
+get_github_resp() {
+	local repo="${1#https://github.com/}"
+	repo="${repo%/}"
+	
+	# Support "owner/repo/com.package.name" or "owner/repo"
+	if [ "$(tr -dc '/' <<<"$repo" | awk '{print length}')" -ge 2 ]; then
+		__GITHUB_PKG_NAME__=$(cut -d/ -f3- <<<"$repo")
+		repo=$(cut -d/ -f1,2 <<<"$repo")
+	else
+		__GITHUB_PKG_NAME__=""
+	fi
+	__GITHUB_REPO__="$repo"
+
+	local r
+	# Query up to 30 latest releases from the repo
+	r=$(gh_req "https://api.github.com/repos/${repo}/releases?per_page=30" -) || return 1
+	if [ -z "$r" ]; then return 1; fi
+
+	# Store all release assets as a compact JSON array
+	__GITHUB_RESP__=$(jq -c '[.[]? // .] | [.[].assets[]?]' <<<"$r") || return 1
+}
+
+get_github_pkg_name() {
+	if [ -n "$__GITHUB_PKG_NAME__" ]; then
+		echo "$__GITHUB_PKG_NAME__"
+	else
+		# Fallback: extract package name from the first asset name (pkg-version-arch.apk)
+		jq -r '.[0].name // empty' <<<"$__GITHUB_RESP__" | cut -d- -f1
+	fi
+}
+
+get_github_vers() {
+	jq -r '.[].name' <<<"$__GITHUB_RESP__" | \
+		sed 's/^[^-]*-//;s/-\(all\|arm64-v8a\|arm-v7a\)\.\(apk\|apkm\)//g'
+}
+
+dl_github() {
+	local repo_arg=$1 version=$2 output=$3 arch=$4 _dpi=$5
+	local version_clean=${version// /}
+	local version_num=${version_clean#v}
+	local arch_clean="${arch// /}"
+
+	if [ -f "${output}.apkm" ]; then
+		merge_splits "${output}.apkm" "$output"
+		return 0
+	fi
+
+	# Search assets for matching version and arch, fallback to '-all'
+	local match
+	match=$(jq -c --arg v "$version_num" --arg a "$arch_clean" \
+		'[.[] | select(.name | test("-" + $v + "-" + $a + "\\.(apk|apkm)$"))][0]' <<<"$__GITHUB_RESP__")
+
+	if [ "$match" = "null" ] || [ -z "$match" ]; then
+		match=$(jq -c --arg v "$version_num" \
+			'[.[] | select(.name | test("-" + $v + "-all\\.(apk|apkm)$"))][0]' <<<"$__GITHUB_RESP__")
+	fi
+
+	if [ "$match" = "null" ] || [ -z "$match" ]; then
+		epr "Asset for version '$version_num' ($arch_clean or all) not found in GitHub release"
+		return 1
+	fi
+
+	local asset_url asset_name
+	asset_url=$(jq -r '.url' <<<"$match")
+	asset_name=$(jq -r '.name' <<<"$match")
+
+	if [ "${asset_name##*.}" = "apkm" ]; then
+		gh_dl "${output}.apkm" "$asset_url" >&2 || return 1
+		merge_splits "${output}.apkm" "$output"
+	else
+		gh_dl "$output" "$asset_url" >&2 || return 1
+	fi
+}
 
 # -------------------- direct --------------------
 dl_direct() {
