@@ -17,6 +17,7 @@ included-patches = "'PoToken provider'"
 apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
 uptodown-dlurl = "https://youtube.en.uptodown.com/android"
 archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.youtube"
+github_dlurl = "roniui/morphe-artifacts/com.google.android.youtube"
 
 [Music-Morphe-arm64-v8a]
 app-name = "Music"
