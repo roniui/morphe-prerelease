@@ -135,7 +135,7 @@ jobs:
           }"
           }
 
-          cd build || { echo "build folder not found, skipping updates"; exit 0; }
+          cd build || { echo "build folder not found"; exit 0; }
           for OUTPUT in *module*.zip; do
             [ "$OUTPUT" = "*module*.zip" ] && continue
             ZIP_S=$(unzip -p "$OUTPUT" module.prop)
@@ -169,7 +169,7 @@ jobs:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
         if: env.TG_TOKEN != null
         run: |
-          cd build || { echo "build folder not found, skipping Telegram"; exit 0; }
+          cd build || { echo "build folder not found"; exit 0; }
 
           TG_CHAT="@rvc_magisk"
           NL=$'\n'
@@ -189,19 +189,20 @@ jobs:
             exit 0
           fi
           
-          if [ -n "$MODULES" ]; then
-            MODULES="Modules:${NL}${MODULES#"$NL"}"
-            if [ -n "$APKS" ]; then MODULES+=${NL}${NL}; fi
-          fi
-          if [ -n "$APKS" ]; then APKS="APKs:${NL}${APKS#"$NL"}"; fi
+          MODULES=${MODULES#"$NL"}
+          APKS=${APKS#"$NL"}
 
-          BODY="$(cat ../build.md)"
+          BODY="$(sed 's/^\* \*\*/↪ \*\*/g; s/^\* `/↪ \*\*/g; s/`/\*/g; s/^\* /\↪/g; s/\*\*/\*/g; s/###//g; s/^- /↪ /g; /^==/d;' ../build.md)"
           MSG="*New build!*
 
           ${BODY}
 
           *▼ Download Links:*
-          ${MODULES}${APKS}
+          Modules:
+          ${MODULES}
+
+          APKs:
+          ${APKS}
           "
           echo "'$MSG'"
           MSG=${MSG:0:9450}
