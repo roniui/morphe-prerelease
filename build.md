@@ -3,7 +3,7 @@ Music-Morphe-arm64-v8a: 9.15.51
 YouTube-Morphe-Universal: 21.16.256  
 
 Install [MicroG-RE](https://github.com/MorpheApp/MicroG-RE/releases) by Morphe for non-root YouTube and YT Music APKs  
-Patches: MorpheApp/patches-1.45.0-dev.17.mpp  
-[Changelog](https://github.com/MorpheApp/morphe-patches/releases/tag/v1.45.0-dev.17)
+Patches: MorpheApp/patches-1.45.0-dev.18.mpp  
+[Changelog](https://github.com/MorpheApp/morphe-patches/releases/tag/v1.45.0-dev.18)
 
 CLI: MorpheApp/morphe-desktop-1.17.0-all.jar    
