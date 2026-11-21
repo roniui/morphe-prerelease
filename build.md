@@ -1,6 +1,6 @@
 
 ⚠️ **CUSTOM BUILD**: Patched using a direct artifact link:
-🔗 https://github.com/roniui/morphe-artifacts/raw/refs/heads/main/file/patches-2.0.0-dev.1.mpp
+🔗 https://github.com/roniui/morphe-artifacts/raw/refs/heads/main/file/patches-2.0.0-dev.1%20(2).mpp
 
 Music-Morphe-arm-v7a: 9.30.53  
 
