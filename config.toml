@@ -52,3 +52,10 @@ apkmirror-dlurl = "https://www.apkmirror.com/apk/redditinc/reddit/"
 archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.reddit.frontpage"
 uptodown-dlurl = "https://reddit-official-app.en.uptodown.com/android"
 dpi = "120-640dpi"
+
+[Moviebox]
+app-name = "Moviebox"
+patches-source = "hxreborn/morphe-patches"
+patches-version = "dev"
+cli-source = "MorpheApp/morphe-cli"
+uptodown-dlurl = "https://com-community-oneroom.en.uptodown.com/android/download/1229268575-x"
