@@ -25,6 +25,10 @@ on:
         description: 'Build YT Music (arm-v7a)'
         type: boolean
         default: true
+      extra_apps:
+        description: 'Extra [App-Name] targets from config.toml (space-separated)'
+        required: false
+        type: string
 
 jobs:
   run:
@@ -68,36 +72,45 @@ jobs:
           NEXT_VER_CODE: ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
           CUSTOM_MPP_URL: ${{ inputs.custom_mpp_url }}
         run: |
-          # Inject "enabled = false" to skip unselected apps natively
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            if [ "${{ inputs.build_youtube }}" != 'true' ]; then
-              sed -i '/^\[YouTube-Morphe-Universal\]/a enabled = "false"' config.toml
-              [ -f config.json ] && jq '."YouTube-Morphe-Universal".enabled = "false"' config.json > tmp.json && mv tmp.json config.json || true
-            fi
-            if [ "${{ inputs.build_ytm_v8a }}" != 'true' ]; then
-              sed -i '/^\[Music-Morphe-arm64-v8a\]/a enabled = "false"' config.toml
-              [ -f config.json ] && jq '."Music-Morphe-arm64-v8a".enabled = "false"' config.json > tmp.json && mv tmp.json config.json || true
-            fi
-            if [ "${{ inputs.build_ytm_v7a }}" != 'true' ]; then
-              sed -i '/^\[Music-Morphe-arm-v7a\]/a enabled = "false"' config.toml
-              [ -f config.json ] && jq '."Music-Morphe-arm-v7a".enabled = "false"' config.json > tmp.json && mv tmp.json config.json || true
-            fi
-            
-            if [ "${{ inputs.build_youtube }}" != 'true' ] && [ "${{ inputs.build_ytm_v8a }}" != 'true' ] && [ "${{ inputs.build_ytm_v7a }}" != 'true' ]; then
+            KEEP_LIST="${{ inputs.extra_apps }}"
+            if [ "${{ inputs.build_youtube }}" == 'true' ]; then KEEP_LIST="$KEEP_LIST YouTube-Morphe-Universal"; fi
+            if [ "${{ inputs.build_ytm_v8a }}" == 'true' ]; then KEEP_LIST="$KEEP_LIST Music-Morphe-arm64-v8a"; fi
+            if [ "${{ inputs.build_ytm_v7a }}" == 'true' ]; then KEEP_LIST="$KEEP_LIST Music-Morphe-arm-v7a"; fi
+
+            # Trim whitespace and exit cleanly if nothing is selected
+            KEEP_LIST=$(echo "$KEEP_LIST" | xargs)
+            if [ -z "$KEEP_LIST" ]; then
               echo "No apps selected for building. Exiting."
               exit 0
             fi
+
+            # Ensure config.json exists, then disable all apps not in KEEP_LIST
+            if [ ! -f "config.json" ]; then
+              ./bin/toml/tq-x86_64 --output json --file config.toml . > config.json
+            fi
+
+            jq --arg keep "$KEEP_LIST" '
+              ($keep | split(" ") | map(select(length > 0))) as $allowed |
+              with_entries(
+                if (.value | type == "object") and (.key | IN($allowed[]) | not) then
+                  .value.enabled = false
+                else
+                  .
+                end
+              )
+            ' config.json > config.json.tmp && mv config.json.tmp config.json
           fi
-          
-          CONFIG_FILE="config.toml"
-          if [ -f "config.json" ]; then CONFIG_FILE="config.json"; fi
-          
-          echo "Executing: ./build.sh $CONFIG_FILE"
-          ./build.sh $CONFIG_FILE
+
+          if [ -f "config.json" ]; then ./build.sh config.json; else ./build.sh config.toml; fi
 
       - name: Get output
         id: get_output
         run: |
+          if [ ! -f "build.md" ]; then
+            echo "No build.md generated. Skipping output."
+            exit 0
+          fi
           DELIM="$(openssl rand -hex 8)"
           echo "BUILD_LOG<<${DELIM}" >> "$GITHUB_OUTPUT"
           cat build.md >> "$GITHUB_OUTPUT"
