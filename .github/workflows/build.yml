@@ -25,6 +25,10 @@ on:
         description: 'Build YT Music (arm-v7a)'
         type: boolean
         default: true
+      build_reddit:
+        description: 'Build Reddit'
+        type: boolean
+        default: true
 
 jobs:
   run:
@@ -82,8 +86,12 @@ jobs:
               sed -i '/^\[Music-Morphe-arm-v7a\]/a enabled = "false"' config.toml
               [ -f config.json ] && jq '."Music-Morphe-arm-v7a".enabled = "false"' config.json > tmp.json && mv tmp.json config.json || true
             fi
+            if [ "${{ inputs.build_reddit }}" != 'true' ]; then
+              sed -i '/^\[Reddit-Morphe\]/a enabled = "false"' config.toml
+              [ -f config.json ] && jq '."Reddit-Morphe".enabled = "false"' config.json > tmp.json && mv tmp.json config.json || true
+            fi
             
-            if [ "${{ inputs.build_youtube }}" != 'true' ] && [ "${{ inputs.build_ytm_v8a }}" != 'true' ] && [ "${{ inputs.build_ytm_v7a }}" != 'true' ]; then
+            if [ "${{ inputs.build_youtube }}" != 'true' ] && [ "${{ inputs.build_ytm_v8a }}" != 'true' ] && [ "${{ inputs.build_ytm_v7a }}" != 'true' ] && [ "${{ inputs.build_reddit }}" != 'true' ]; then
               echo "No apps selected for building. Exiting."
               exit 0
             fi
